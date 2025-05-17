@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, post, web};
-use dashmap::DashMap;
 use parser::SyncSource;
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, Sender};
@@ -13,12 +12,12 @@ mod sorter;
 mod wp;
 
 pub struct SharedState {
-    map: DashMap<SyncSource, String>,
+    map: Mutex<HashMap<SyncSource, String>>,
     client: mw::Client,
+    req: reqwest::Client,
 }
 
 pub struct State {
-    shared: Arc<SharedState>,
     sort: Sender<GitHubPush>,
 }
 
@@ -66,8 +65,6 @@ struct GitHubCommit {
     message: String,
     added: Vec<String>,
     modified: Vec<String>,
-    id: String,
-    url: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -99,7 +96,7 @@ async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl
     let Ok(push) = serde_json::from_str::<GitHubPush>(&body) else {
         return HttpResponse::ImATeapot().finish();
     };
-     
+
     println!("{push:?}");
 
     if let Err(e) = state.sort.try_send(push) {
@@ -125,14 +122,29 @@ async fn main() -> color_eyre::Result<()> {
         .await?;
 
     let (sort_send, sort_recv) = mpsc::channel(10);
+    let (reparse_send, reparse_recv) = mpsc::channel(10);
     let shared = Arc::new(SharedState {
-        map: DashMap::new(),
+        map: Mutex::new(HashMap::new()),
         client,
+        req: reqwest::ClientBuilder::new().use_rustls_tls().build()?,
     });
     let data = web::Data::new(State {
         sort: sort_send,
-        shared: shared.clone(),
+        // shared: shared.clone(),
     });
+
+    let sortctx = sorter::Context {
+        ss: shared.clone(),
+        reparse_request: reparse_send,
+        recv: sort_recv,
+    };
+    sorter::start(sortctx);
+
+    let parsectx = parser::Context {
+        ss: shared.clone(),
+        reparse_recv,
+    };
+    parser::start(parsectx);
 
     HttpServer::new(move || App::new().app_data(data.clone()).service(handle))
         .bind(("0.0.0.0", 8000))?

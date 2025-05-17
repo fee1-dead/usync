@@ -1,20 +1,20 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::mpsc::Receiver;
 
 use tokio::sync::mpsc::Sender;
 
-use crate::parser::SyncSource;
 use crate::Commits;
 use crate::SharedState;
+use crate::parser::SyncSource;
 use crate::{GitHubPush, Push};
 
 pub struct Context {
     pub ss: Arc<SharedState>,
     pub recv: Receiver<GitHubPush>,
     pub reparse_request: Sender<()>,
-    pub send: Sender<Push>,
 }
 
 pub fn parse_webhook(p: GitHubPush) -> Push {
@@ -35,22 +35,108 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
         url: p.compare,
     }
 }
- 
-pub fn parse_wikitext_header(s: String) {
 
+#[derive(Clone, PartialEq, Eq)]
+pub struct Header {
+    repo: String,
+    ref_: String,
+    file: String,
 }
 
-pub fn start(mut cx: Context) {
-    tokio::spawn(async move { while let Some(push) = cx.recv.recv().await {
-        if let Some(config) = cx.ss.map.get(&SyncSource {
-            repo: push.repository.html_url.clone(),
-            ref_: push.ref_.clone(),
-        }) {
-            if let Ok(text) = crate::wp::fetch(&cx.ss, &*config).await {
-                
-            }
-        } else {
+pub fn parse_js_header(s: String) -> Option<Header> {
+    let mut it = s
+        .strip_prefix("// [[User:0xDeadbeef/usync]]:")?
+        .lines()
+        .next()?
+        .trim()
+        .split_whitespace()
+        .map(ToOwned::to_owned);
+    let repo = it.next()?;
+    let ref_ = it.next()?;
+    let file = it.next()?;
+    if it.next().is_some() {
+        return None;
+    }
+    Some(Header { repo, ref_, file })
+}
+
+pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
+    // refetch the info on-wiki to compare
+    let Some(header) = crate::wp::fetch(&ss, &title)
+        .await
+        .ok()
+        .and_then(parse_js_header)
+    else {
+        return;
+    };
+
+    // check again that the reference and the repo url match
+    if push.ref_ != header.ref_ || push.repository.html_url != header.repo {
+        return;
+    }
+
+    // the file must have been modified on Git's side for us to trigger an update
+    if !push
+        .commits
+        .iter()
+        .flat_map(|c| c.added.iter().chain(&c.modified))
+        .any(|path| path == &header.file)
+    {
+        return;
+    }
+
+    // e.g. https://raw.githubusercontent.com/fee1-dead/usync
+    let repo_base = header
+        .repo
+        .replace("https://github.com/", "https://raw.githubusercontent.com/");
+    // e.g. https://raw.githubusercontent.com/fee1-dead/usync/refs/heads/main/test.js
+    let file_url = format!("{repo_base}/{}/{}", header.ref_, header.file);
+
+    // TODO: handle these errors and log
+    let Ok(res) = ss.req.get(&file_url).send().await else {
+        return;
+    };
+
+    let Ok(text) = res.text().await else {
+        return;
+    };
+
+    // ensure that the github side has the same header.
+    if parse_js_header(text) != Some(header) {
+        return;
+    }
+
+    todo!()
+}
+
+pub async fn task(mut cx: Context) {
+    while let Some(push) = cx.recv.recv().await {
+        // we must already know of an on-wiki sync file with the given repo and reference
+        let config = {
+            // be very careful as to not hold the lock for too long
+            let lock = cx.ss.map.lock().unwrap();
+            let config = lock.get(&SyncSource {
+                repo: push.repository.html_url.clone(),
+                ref_: push.ref_.clone(),
+            }).map(ToOwned::to_owned);
+
+            drop(lock);
+
+            config
+        };
+
+        let Some(config) = config else {
             cx.reparse_request.send(()).await.unwrap();
-        }
-    } });
+            continue;
+        };
+
+        tokio::spawn(tokio::time::timeout(
+            Duration::from_secs(5),
+            sort(cx.ss.clone(), push, config.to_owned()),
+        ));
+    }
+}
+
+pub fn start(cx: Context) {
+    tokio::spawn(task(cx));
 }

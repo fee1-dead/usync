@@ -1,8 +1,10 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::StreamExt;
 use serde::Deserialize;
+use tokio::sync::mpsc::Receiver;
 
 use crate::SharedState;
 
@@ -63,7 +65,7 @@ struct Config {
     syncs: Vec<Sync>,
 }
 
-async fn search(client: mw::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
+async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
     let mut stream = client.get_all(
         &[
             ("action", "query"),
@@ -134,6 +136,28 @@ async fn search(client: mw::Client) -> color_eyre::Result<HashMap<SyncSource, St
     Ok(syncs)
 }
 
-pub fn do_work(s: SharedState) {
-    tokio::spawn(async move {});
+pub struct Context {
+    pub ss: Arc<SharedState>,
+    pub reparse_recv: Receiver<()>,
+}
+
+pub async fn task(mut ctx: Context) {
+    // passively update everything per hour
+    let mut int = tokio::time::interval(Duration::from_secs(60*60));
+
+    loop {
+        tokio::select! {
+            _ = int.tick() => (),
+            Some(_) = ctx.reparse_recv.recv() => (),
+            else => break,
+        }
+
+        if let Ok(res) = search(&ctx.ss.client).await {
+            *ctx.ss.map.lock().unwrap() = res;
+        }
+    }
+}
+
+pub fn start(ctx: Context) {
+    tokio::spawn(task(ctx));
 }
