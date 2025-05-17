@@ -52,14 +52,14 @@ pub struct Push {
     url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct GitHubAuthor {
     name: String,
     #[serde(default)]
     username: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct GitHubCommit {
     author: GitHubAuthor,
     committer: GitHubAuthor,
@@ -70,14 +70,19 @@ struct GitHubCommit {
     url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
+struct Repository {
+    html_url: String,
+}
+
+#[derive(Deserialize, Debug)]
 struct GitHubPush {
     compare: String,
     commits: Vec<GitHubCommit>,
     pusher: GitHubAuthor,
     #[serde(rename = "ref")]
-    r#ref: String,
-    repository: String,
+    ref_: String,
+    repository: Repository,
 }
 
 #[post("/")]
@@ -94,6 +99,8 @@ async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl
     let Ok(push) = serde_json::from_str::<GitHubPush>(&body) else {
         return HttpResponse::ImATeapot().finish();
     };
+     
+    println!("{push:?}");
 
     if let Err(e) = state.sort.try_send(push) {
         tracing::error!(?e, "cannot send to sorter!");

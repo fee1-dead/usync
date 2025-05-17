@@ -37,14 +37,14 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
 }
  
 pub fn parse_wikitext_header(s: String) {
-    
+
 }
 
 pub fn start(mut cx: Context) {
     tokio::spawn(async move { while let Some(push) = cx.recv.recv().await {
         if let Some(config) = cx.ss.map.get(&SyncSource {
-            repo: push.repository.clone(),
-            ref_: push.r#ref.clone(),
+            repo: push.repository.html_url.clone(),
+            ref_: push.ref_.clone(),
         }) {
             if let Ok(text) = crate::wp::fetch(&cx.ss, &*config).await {
                 
