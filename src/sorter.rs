@@ -24,6 +24,7 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
     } else {
         Commits::Multiple(p.commits.len())
     };
+    names.insert(p.pusher.name);
     for commit in p.commits {
         names.insert(commit.author.name);
         names.insert(commit.committer.name);
@@ -43,7 +44,7 @@ pub struct Header {
     file: String,
 }
 
-pub fn parse_js_header(s: String) -> Option<Header> {
+pub fn parse_js_header(s: &str) -> Option<Header> {
     let mut it = s
         .strip_prefix("// [[User:0xDeadbeef/usync]]:")?
         .lines()
@@ -61,12 +62,11 @@ pub fn parse_js_header(s: String) -> Option<Header> {
 }
 
 pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
+    let Ok(orig_src) = crate::wp::fetch(&ss, &title).await else {
+        return;
+    };
     // refetch the info on-wiki to compare
-    let Some(header) = crate::wp::fetch(&ss, &title)
-        .await
-        .ok()
-        .and_then(parse_js_header)
-    else {
+    let Some(header) = parse_js_header(&orig_src) else {
         return;
     };
 
@@ -97,16 +97,48 @@ pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
         return;
     };
 
-    let Ok(text) = res.text().await else {
+    let Ok(newtext) = res.text().await else {
         return;
     };
 
-    // ensure that the github side has the same header.
-    if parse_js_header(text) != Some(header) {
+    // no need to edit if nothing changed
+    if newtext == orig_src {
         return;
     }
 
-    todo!()
+    // ensure that the github side has the same header.
+    if parse_js_header(&newtext) != Some(header) {
+        return;
+    }
+
+    let push = parse_webhook(push);
+
+    let summary = push.into_edit_summary();
+
+    let Ok(tok) = ss.client.get_token("csrf").await else {
+        return;
+    };
+
+    match ss.client.post([
+        ("action", "edit"),
+        ("title", &title),
+        ("text", &newtext),
+        ("summary", &summary),
+        ("bot", "1"),
+        ("nocreate", "1"),
+        ("contentformat", "text/javascript"),
+        ("contentmodel", "javascript"),
+        ("token", &tok),
+    ]).send().await {
+        Ok(res) => {
+            if let Err(e) = res.error_for_status() {
+                tracing::error!(?e, "status response for edit");
+            }
+        }
+        Err(e) => {
+            tracing::error!(?e, "edit");
+        }
+    }
 }
 
 pub async fn task(mut cx: Context) {
@@ -115,10 +147,12 @@ pub async fn task(mut cx: Context) {
         let config = {
             // be very careful as to not hold the lock for too long
             let lock = cx.ss.map.lock().unwrap();
-            let config = lock.get(&SyncSource {
-                repo: push.repository.html_url.clone(),
-                ref_: push.ref_.clone(),
-            }).map(ToOwned::to_owned);
+            let config = lock
+                .get(&SyncSource {
+                    repo: push.repository.html_url.clone(),
+                    ref_: push.ref_.clone(),
+                })
+                .map(ToOwned::to_owned);
 
             drop(lock);
 

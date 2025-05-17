@@ -143,7 +143,7 @@ pub struct Context {
 
 pub async fn task(mut ctx: Context) {
     // passively update everything per hour
-    let mut int = tokio::time::interval(Duration::from_secs(60*60));
+    let mut int = tokio::time::interval(Duration::from_secs(60 * 60));
 
     loop {
         tokio::select! {

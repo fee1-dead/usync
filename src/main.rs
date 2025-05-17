@@ -51,11 +51,31 @@ pub struct Push {
     url: String,
 }
 
+impl Push {
+    pub fn into_edit_summary(self) -> String {
+        let author = match &*self.authors {
+            [] => {
+                unreachable!()
+            }
+            [list @ ..] if list.len() <= 3 => list.join(", "),
+            [first, rest @ ..] => {
+                format!("{first} and {} others", rest.len())
+            }
+        };
+
+        let commit = match self.commits {
+            Commits::Single(msg) => msg,
+            Commits::Multiple(n) => format!("{n} commits"),
+        };
+
+        // TODO add BRFA link
+        format!("{author}: {commit} ({})", self.url)
+    }
+}
+
 #[derive(Deserialize, Debug)]
 struct GitHubAuthor {
     name: String,
-    #[serde(default)]
-    username: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
