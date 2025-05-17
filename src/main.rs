@@ -133,7 +133,9 @@ pub struct Secrets {
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     let secrets = fs::read_to_string("./secrets.toml")?;
     let secrets: Secrets = toml::from_str(&secrets)?;

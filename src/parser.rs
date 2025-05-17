@@ -7,8 +7,8 @@ use serde::Deserialize;
 use tokio::sync::mpsc::Receiver;
 use tracing::debug;
 
-use crate::sorter::parse_js_header;
 use crate::SharedState;
+use crate::sorter::parse_js_header;
 
 #[derive(Deserialize)]
 struct Slot {
@@ -95,7 +95,13 @@ async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, S
             continue;
         };
 
-        syncs.insert(SyncSource { repo: header.repo, ref_: header.ref_ }, item.title);
+        syncs.insert(
+            SyncSource {
+                repo: header.repo,
+                ref_: header.ref_,
+            },
+            item.title,
+        );
     }
 
     Ok(syncs)

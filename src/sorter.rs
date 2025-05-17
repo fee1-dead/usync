@@ -81,19 +81,30 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         return;
     }
 
-    push.commits.retain(|c| c.added.contains(&header.file) || c.modified.contains(&header.file));
+    push.commits
+        .retain(|c| c.added.contains(&header.file) || c.modified.contains(&header.file));
     // the file must have been modified on Git's side for us to trigger an update
-    if push.commits.is_empty()
-    {
+    if push.commits.is_empty() {
         info!("not modified");
         return;
     }
 
     // e.g. https://api.github.com/repos/fee1-dead/usync/contents/test.js
-    let file_url = push.repository.contents_url.replace("{+path}", &header.file);
+    let file_url = push
+        .repository
+        .contents_url
+        .replace("{+path}", &header.file);
 
     // TODO: handle these errors and log
-    let Ok(res) = ss.req.get(&file_url).query(&[("ref", &header.ref_)]).header("Accept", "application/vnd.github.raw+json").send().await else {
+    let Ok(res) = ss
+        .req
+        .get(&file_url)
+        .query(&[("ref", &header.ref_)])
+        .header("Accept", "application/vnd.github.raw+json")
+        .header("User-Agent", "fee1-dead/usync")
+        .send()
+        .await
+    else {
         error!("couldn't get content from github");
         return;
     };
@@ -125,17 +136,22 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         return;
     };
 
-    match ss.client.post([
-        ("action", "edit"),
-        ("title", &title),
-        ("text", &newtext),
-        ("summary", &summary),
-        ("bot", "1"),
-        ("nocreate", "1"),
-        ("contentformat", "text/javascript"),
-        ("contentmodel", "javascript"),
-        ("token", &tok),
-    ]).send().await {
+    match ss
+        .client
+        .post([
+            ("action", "edit"),
+            ("title", &title),
+            ("text", &newtext),
+            ("summary", &summary),
+            ("bot", "1"),
+            ("nocreate", "1"),
+            ("contentformat", "text/javascript"),
+            ("contentmodel", "javascript"),
+            ("token", &tok),
+        ])
+        .send()
+        .await
+    {
         Ok(res) => {
             debug!(?res);
             match res.error_for_status() {
