@@ -8,6 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
+use tracing::trace;
 
 use crate::Commits;
 use crate::SharedState;
@@ -88,15 +89,11 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         return;
     }
 
-    // e.g. https://raw.githubusercontent.com/fee1-dead/usync
-    let repo_base = header
-        .repo
-        .replace("https://github.com/", "https://raw.githubusercontent.com/");
-    // e.g. https://raw.githubusercontent.com/fee1-dead/usync/refs/heads/main/test.js
-    let file_url = format!("{repo_base}/{}/{}", header.ref_, header.file);
+    // e.g. https://api.github.com/repos/fee1-dead/usync/contents/test.js
+    let file_url = push.repository.contents_url.replace("{+path}", &header.file);
 
     // TODO: handle these errors and log
-    let Ok(res) = ss.req.get(&file_url).send().await else {
+    let Ok(res) = ss.req.get(&file_url).query(&[("ref", &header.ref_)]).header("Accept", "application/vnd.github.raw+json").send().await else {
         error!("couldn't get content from github");
         return;
     };
@@ -105,6 +102,7 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         error!("couldn't get text from github");
         return;
     };
+    trace!(%newtext, %orig_src);
 
     // no need to edit if nothing changed
     if newtext == orig_src {

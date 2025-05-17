@@ -91,6 +91,7 @@ struct GitHubCommit {
 #[derive(Deserialize, Debug)]
 struct Repository {
     html_url: String,
+    contents_url: String,
 }
 
 #[derive(Deserialize, Debug)]
