@@ -6,7 +6,6 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, post, web
 use parser::SyncSource;
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, Sender};
-use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
 mod parser;
@@ -116,8 +115,6 @@ async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl
     let Ok(push) = serde_json::from_str::<GitHubPush>(&body) else {
         return HttpResponse::ImATeapot().finish();
     };
-
-    debug!(?push);
 
     if let Err(e) = state.sort.try_send(push) {
         tracing::error!(?e, "cannot send to sorter!");

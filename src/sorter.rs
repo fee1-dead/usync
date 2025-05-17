@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 
 use tokio::sync::mpsc::Sender;
+use tracing::debug;
 use tracing::error;
 use tracing::info;
 
@@ -150,6 +151,7 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
 
 pub async fn task(mut cx: Context) {
     while let Some(push) = cx.recv.recv().await {
+        debug!(?push, "got task");
         // we must already know of an on-wiki sync file with the given repo and reference
         let config = {
             // be very careful as to not hold the lock for too long
@@ -165,6 +167,8 @@ pub async fn task(mut cx: Context) {
 
             config
         };
+
+        debug!(?config, "config");
 
         let Some(config) = config else {
             info!("no config obtained");
