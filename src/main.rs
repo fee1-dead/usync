@@ -82,6 +82,7 @@ struct GitHubPush {
 
 #[post("/")]
 async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl Responder {
+    println!("{body}");
     let Some(val) = req.headers().get("X-GitHub-Event") else {
         return HttpResponse::ImATeapot().finish();
     };
