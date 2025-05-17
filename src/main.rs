@@ -6,6 +6,7 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, post, web
 use parser::SyncSource;
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, Sender};
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
 mod parser;
@@ -104,7 +105,6 @@ struct GitHubPush {
 
 #[post("/")]
 async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl Responder {
-    println!("{body}");
     let Some(val) = req.headers().get("X-GitHub-Event") else {
         return HttpResponse::ImATeapot().finish();
     };
@@ -117,7 +117,7 @@ async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl
         return HttpResponse::ImATeapot().finish();
     };
 
-    println!("{push:?}");
+    debug!(?push);
 
     if let Err(e) = state.sort.try_send(push) {
         tracing::error!(?e, "cannot send to sorter!");

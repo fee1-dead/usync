@@ -5,6 +5,8 @@ use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 
 use tokio::sync::mpsc::Sender;
+use tracing::error;
+use tracing::info;
 
 use crate::Commits;
 use crate::SharedState;
@@ -62,15 +64,18 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
 
 pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
     let Ok(orig_src) = crate::wp::fetch(&ss, &title).await else {
+        error!("couldn't fetch");
         return;
     };
     // refetch the info on-wiki to compare
     let Some(header) = parse_js_header(&orig_src) else {
+        error!("couldn't parse on-wiki header");
         return;
     };
 
     // check again that the reference and the repo url match
     if push.ref_ != header.ref_ || push.repository.html_url != header.repo {
+        error!("2nd comparison failed");
         return;
     }
 
@@ -81,6 +86,7 @@ pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
         .flat_map(|c| c.added.iter().chain(&c.modified))
         .any(|path| path == &header.file)
     {
+        info!("not modified");
         return;
     }
 
@@ -93,20 +99,24 @@ pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
 
     // TODO: handle these errors and log
     let Ok(res) = ss.req.get(&file_url).send().await else {
+        error!("couldn't get content from github");
         return;
     };
 
     let Ok(newtext) = res.text().await else {
+        error!("couldn't get text from github");
         return;
     };
 
     // no need to edit if nothing changed
     if newtext == orig_src {
+        info!("nothing changed");
         return;
     }
 
     // ensure that the github side has the same header.
     if parse_js_header(&newtext) != Some(header) {
+        info!("header mismatched");
         return;
     }
 
@@ -115,6 +125,7 @@ pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
     let summary = push.into_edit_summary();
 
     let Ok(tok) = ss.client.get_token("csrf").await else {
+        error!("couldn't get csrf token");
         return;
     };
 
@@ -159,6 +170,7 @@ pub async fn task(mut cx: Context) {
         };
 
         let Some(config) = config else {
+            info!("no config obtained");
             cx.reparse_request.send(()).await.unwrap();
             continue;
         };
