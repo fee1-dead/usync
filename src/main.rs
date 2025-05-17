@@ -97,7 +97,6 @@ struct Repository {
 struct GitHubPush {
     compare: String,
     commits: Vec<GitHubCommit>,
-    pusher: GitHubAuthor,
     #[serde(rename = "ref")]
     ref_: String,
     repository: Repository,

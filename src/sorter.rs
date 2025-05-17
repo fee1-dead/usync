@@ -24,7 +24,6 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
     } else {
         Commits::Multiple(p.commits.len())
     };
-    names.insert(p.pusher.name);
     for commit in p.commits {
         names.insert(commit.author.name);
         names.insert(commit.committer.name);
