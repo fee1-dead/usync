@@ -39,9 +39,9 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Header {
-    repo: String,
-    ref_: String,
-    file: String,
+    pub repo: String,
+    pub ref_: String,
+    pub file: String,
 }
 
 pub fn parse_js_header(s: &str) -> Option<Header> {

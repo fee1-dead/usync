@@ -5,7 +5,9 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use serde::Deserialize;
 use tokio::sync::mpsc::Receiver;
+use tracing::debug;
 
+use crate::sorter::parse_js_header;
 use crate::SharedState;
 
 #[derive(Deserialize)]
@@ -47,22 +49,11 @@ struct PageInfo {
     content: String,
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Hash, PartialEq, Eq, Deserialize, Debug)]
 pub struct SyncSource {
     pub repo: String,
     #[serde(rename = "ref")]
     pub ref_: String,
-}
-
-#[derive(Deserialize)]
-struct Sync {
-    source: SyncSource,
-    target_title: String,
-}
-
-#[derive(Deserialize)]
-struct Config {
-    syncs: Vec<Sync>,
 }
 
 async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
@@ -93,44 +84,18 @@ async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, S
 
     let mut syncs = HashMap::new();
 
-    'outer: while let Some(item) = stream.next().await {
+    while let Some(item) = stream.next().await {
         let item = item?;
-        // usr is "User:0xDeadbeef"
-        let Some((usr, _)) = item.title.split_once('/') else {
-            continue;
-        };
-        /* let Some(usr) = usr.strip_prefix("User:") else {
-            // TODO does this scale to other languages?
-            continue;
-        }; */
+
         if item.contentmodel != "javascript" {
             continue;
         }
-        let Some(json_start) = item.content.find('{') else {
-            continue;
-        };
-        let Some(json_end) = item.content.rfind('}') else {
-            continue;
-        };
 
-        let json = &item.content[json_start..=json_end];
-
-        let Ok(cfg) = serde_json::from_str::<Config>(json) else {
+        let Some(header) = parse_js_header(&item.content) else {
             continue;
         };
 
-        for sync in &cfg.syncs {
-            if !sync.target_title.starts_with(usr)
-                || sync.target_title.as_bytes().get(usr.len()) != Some(&b'/')
-            {
-                // target isn't under one's userspace. bail
-                continue 'outer;
-            }
-        }
-
-        for sync in cfg.syncs {
-            syncs.insert(sync.source, sync.target_title);
-        }
+        syncs.insert(SyncSource { repo: header.repo, ref_: header.ref_ }, item.title);
     }
 
     Ok(syncs)
@@ -153,6 +118,7 @@ pub async fn task(mut ctx: Context) {
         }
 
         if let Ok(res) = search(&ctx.ss.client).await {
+            debug!(?res, "parsed map");
             *ctx.ss.map.lock().unwrap() = res;
         }
     }

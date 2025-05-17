@@ -6,6 +6,7 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, post, web
 use parser::SyncSource;
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, Sender};
+use tracing_subscriber::EnvFilter;
 
 mod parser;
 mod sorter;
@@ -135,6 +136,8 @@ pub struct Secrets {
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+    tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).init();
+
     let secrets = fs::read_to_string("./secrets.toml")?;
     let secrets: Secrets = toml::from_str(&secrets)?;
     let (client, _) = mw::ClientBuilder::new("https://en.wikipedia.org/w/api.php")
