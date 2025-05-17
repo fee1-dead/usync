@@ -139,6 +139,7 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         ("token", &tok),
     ]).send().await {
         Ok(res) => {
+            debug!(?res);
             if let Err(e) = res.error_for_status() {
                 tracing::error!(?e, "status response for edit");
             }
