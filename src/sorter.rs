@@ -62,7 +62,7 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
     Some(Header { repo, ref_, file })
 }
 
-pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
+pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
     let Ok(orig_src) = crate::wp::fetch(&ss, &title).await else {
         error!("couldn't fetch");
         return;
@@ -79,12 +79,9 @@ pub async fn sort(ss: Arc<SharedState>, push: GitHubPush, title: String) {
         return;
     }
 
+    push.commits.retain(|c| c.added.contains(&header.file) || c.modified.contains(&header.file));
     // the file must have been modified on Git's side for us to trigger an update
-    if !push
-        .commits
-        .iter()
-        .flat_map(|c| c.added.iter().chain(&c.modified))
-        .any(|path| path == &header.file)
+    if push.commits.is_empty()
     {
         info!("not modified");
         return;
