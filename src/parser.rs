@@ -7,40 +7,9 @@ use serde::Deserialize;
 use tokio::sync::mpsc::Receiver;
 use tracing::debug;
 
+use crate::wp::MultiPageResponse;
 use crate::SharedState;
-use crate::sorter::parse_js_header;
-
-#[derive(Deserialize)]
-struct Slot {
-    contentmodel: String,
-    content: String,
-}
-
-#[derive(Deserialize)]
-struct Slots {
-    main: Slot,
-}
-
-#[derive(Deserialize)]
-struct Revision {
-    slots: Slots,
-}
-
-#[derive(Deserialize)]
-struct Page {
-    title: String,
-    revisions: [Revision; 1],
-}
-
-#[derive(Deserialize)]
-struct Query {
-    pages: Vec<Page>,
-}
-
-#[derive(Deserialize)]
-struct Response {
-    query: Query,
-}
+use crate::updater::parse_js_header;
 
 #[derive(Debug)]
 struct PageInfo {
@@ -66,7 +35,7 @@ async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, S
             ("rvprop", "content|contentmodel"),
             ("rvslots", "main"),
         ],
-        |r: Response| {
+        |r: MultiPageResponse| {
             Ok(r.query
                 .pages
                 .into_iter()

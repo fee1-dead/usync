@@ -3,31 +3,42 @@ use serde::Deserialize;
 
 use crate::SharedState;
 
+#[derive(Deserialize)]
+pub struct MainSlot {
+    pub content: String,
+    pub contentmodel: String,
+}
+
+#[derive(Deserialize)]
+pub struct Slots {
+    pub main: MainSlot,
+}
+
+#[derive(Deserialize)]
+pub struct Revision {
+    pub slots: Slots,
+}
+
+#[derive(Deserialize)]
+pub struct Page {
+    pub title: String,
+    pub revisions: [Revision; 1],
+}
+
+#[derive(Deserialize)]
+pub struct Pages<P> {
+    pub pages: P,
+}
+
+#[derive(Deserialize)]
+pub struct Response<P> {
+    pub query: Pages<P>,
+}
+
+pub type SinglePageResponse = Response<[Page; 1]>;
+pub type MultiPageResponse = Response<Vec<Page>>;
+
 pub async fn fetch(ss: &SharedState, title: &str) -> Result<String> {
-    #[derive(Deserialize)]
-    struct MainSlot {
-        content: String,
-    }
-    #[derive(Deserialize)]
-    struct Slots {
-        main: MainSlot,
-    }
-    #[derive(Deserialize)]
-    struct Revision {
-        slots: Slots,
-    }
-    #[derive(Deserialize)]
-    struct Page {
-        revisions: [Revision; 1],
-    }
-    #[derive(Deserialize)]
-    struct Pages {
-        pages: [Page; 1],
-    }
-    #[derive(Deserialize)]
-    struct Response {
-        query: Pages,
-    }
     let r = ss
         .client
         .get([
@@ -41,8 +52,8 @@ pub async fn fetch(ss: &SharedState, title: &str) -> Result<String> {
         .send()
         .await?
         .error_for_status()?
-        .json::<Response>()
+        .json::<SinglePageResponse>()
         .await?;
-    let [Page { revisions: [rev] }] = r.query.pages;
+    let [Page { revisions: [rev], title: _ }] = r.query.pages;
     Ok(rev.slots.main.content)
 }

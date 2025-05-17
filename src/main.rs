@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{self, Sender};
 use tracing_subscriber::EnvFilter;
 
 mod parser;
-mod sorter;
+mod updater;
 mod wp;
 
 pub struct SharedState {
@@ -143,7 +143,7 @@ async fn main() -> color_eyre::Result<()> {
         .login_oauth(&secrets.oauth_token)
         .await?;
 
-    let (sort_send, sort_recv) = mpsc::channel(10);
+    let (sort_send, update_recv) = mpsc::channel(10);
     let (reparse_send, reparse_recv) = mpsc::channel(10);
     let shared = Arc::new(SharedState {
         map: Mutex::new(HashMap::new()),
@@ -155,12 +155,12 @@ async fn main() -> color_eyre::Result<()> {
         // shared: shared.clone(),
     });
 
-    let sortctx = sorter::Context {
+    let updaterctx = updater::Context {
         ss: shared.clone(),
         reparse_request: reparse_send,
-        recv: sort_recv,
+        recv: update_recv,
     };
-    sorter::start(sortctx);
+    updater::start(updaterctx);
 
     let parsectx = parser::Context {
         ss: shared.clone(),
