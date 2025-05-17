@@ -172,10 +172,18 @@ pub async fn task(mut cx: Context) {
             continue;
         };
 
-        tokio::spawn(tokio::time::timeout(
+        let task = tokio::time::timeout(
             Duration::from_secs(5),
             sort(cx.ss.clone(), push, config.to_owned()),
-        ));
+        );
+        tokio::spawn(async move {
+            match task.await {
+                Err(_) => {
+                    tracing::error!("task timed out!");
+                }
+                Ok(()) => {}
+            }
+        });
     }
 }
 
