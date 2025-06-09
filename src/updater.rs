@@ -44,24 +44,53 @@ pub fn parse_webhook(p: GitHubPush) -> Push {
 pub struct Header {
     pub repo: String,
     pub ref_: String,
-    pub file: String,
+    pub path: String,
 }
 
 pub fn parse_js_header(s: &str) -> Option<Header> {
-    let mut it = s
-        .strip_prefix("// [[User:0xDeadbeef/usync]]:")?
+    let it = s
         .lines()
         .next()?
         .trim()
-        .split_whitespace()
-        .map(ToOwned::to_owned);
-    let repo = it.next()?;
-    let ref_ = it.next()?;
-    let file = it.next()?;
-    if it.next().is_some() {
-        return None;
+        .strip_prefix("//")?.trim_start()
+        .strip_prefix("{{Wikipedia:USync")?
+        .strip_suffix("}}")?
+        .trim()
+        .split('|')
+        .map(str::trim);
+
+    let mut repo = None;
+    let mut ref_ = None;
+    let mut path = None;
+        
+    for frag in it {
+        let Some((param, arg)) = frag.split_once('=') else {
+            continue;
+        };
+
+        match param.trim() {
+            "repo" => repo = Some(arg.trim().to_owned()),
+            "ref" => ref_ = Some(arg.trim().to_owned()),
+            "path" => path = Some(arg.trim().to_owned()),
+            _ => {}
+        }
     }
-    Some(Header { repo, ref_, file })
+
+    Some(Header { repo: repo?, ref_: ref_?, path: path? })
+}
+
+#[test]
+fn test_header_parse() {
+    let h = "// {{Wikipedia:USync | repo = https://github.com/fee1-dead/usync |ref = refs/heads/main |path=test.js}}";
+
+    let h = parse_js_header(h);
+
+    assert!(h.is_some());
+
+    let h = h.unwrap();
+    assert_eq!("https://github.com/fee1-dead/usync", h.repo);
+    assert_eq!("refs/heads/main", h.ref_);
+    assert_eq!("test.js", h.path);
 }
 
 pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
@@ -82,7 +111,7 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
     }
 
     push.commits
-        .retain(|c| c.added.contains(&header.file) || c.modified.contains(&header.file));
+        .retain(|c| c.added.contains(&header.path) || c.modified.contains(&header.path));
     // the file must have been modified on Git's side for us to trigger an update
     if push.commits.is_empty() {
         info!("not modified");
@@ -93,7 +122,7 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
     let file_url = push
         .repository
         .contents_url
-        .replace("{+path}", &header.file);
+        .replace("{+path}", &header.path);
 
     // TODO: handle these errors and log
     let Ok(res) = ss

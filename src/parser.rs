@@ -25,12 +25,12 @@ pub struct SyncSource {
     pub ref_: String,
 }
 
-async fn search(client: &mw::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
+async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
     let mut stream = client.get_all(
         &[
             ("action", "query"),
-            ("generator", "linkshere"),
-            ("pageids", "79491367"),
+            ("generator", "transcludedin"),
+            ("pageids", "80169683"),
             ("prop", "revisions"),
             ("rvprop", "content|contentmodel"),
             ("rvslots", "main"),

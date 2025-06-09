@@ -14,7 +14,7 @@ mod wp;
 
 pub struct SharedState {
     map: Mutex<HashMap<SyncSource, String>>,
-    client: mw::Client,
+    client: w::Client,
     req: reqwest::Client,
 }
 
@@ -69,8 +69,7 @@ impl Push {
             Commits::Multiple(n) => format!("{n} commits"),
         };
 
-        // TODO add BRFA link
-        format!("{author}: {commit} ({})", self.url)
+        format!("[[[Wikipedia:Bots/Requests for approval/DeadbeefBot II|BOT]]] {author}: {commit} ({})", self.url)
     }
 }
 
@@ -103,7 +102,7 @@ struct GitHubPush {
     repository: Repository,
 }
 
-#[post("/")]
+#[post("/webhook")]
 async fn handle(state: web::Data<State>, req: HttpRequest, body: String) -> impl Responder {
     let Some(val) = req.headers().get("X-GitHub-Event") else {
         return HttpResponse::ImATeapot().finish();
@@ -133,13 +132,15 @@ pub struct Secrets {
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+
+    // todo add discord layer https://docs.rs/tracing-layer-discord/latest/tracing_layer_discord/
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     let secrets = fs::read_to_string("./secrets.toml")?;
     let secrets: Secrets = toml::from_str(&secrets)?;
-    let (client, _) = mw::ClientBuilder::new("https://en.wikipedia.org/w/api.php")
+    let (client, _) = w::ClientBuilder::new("https://en.wikipedia.org/w/api.php")
         .login_oauth(&secrets.oauth_token)
         .await?;
 
