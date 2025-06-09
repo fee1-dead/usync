@@ -2044,6 +2044,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "w"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9b9ae3e8c03c8f3f9db9ee22498f507848d37351196433be7833e96fa9e030e"
 dependencies = [
  "futures-util",
  "pin-project",
