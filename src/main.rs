@@ -42,7 +42,7 @@ impl Push {
             [] => {
                 unreachable!()
             }
-            [list @ ..] if list.len() <= 3 => list.join(", "),
+            list if list.len() <= 3 => list.join(", "),
             [first, rest @ ..] => {
                 format!("{first} and {} others", rest.len())
             }

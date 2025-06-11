@@ -6,6 +6,7 @@ use futures_util::future::try_join_all;
 use tokio::sync::mpsc::Receiver;
 
 use tokio::sync::mpsc::Sender;
+use tokio::time::error::Elapsed;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -257,11 +258,8 @@ pub async fn task(mut cx: Context) {
         });
 
         tokio::spawn(async move {
-            match try_join_all(tasks).await {
-                Err(_) => {
-                    tracing::error!("task timed out!");
-                }
-                Ok(_) => {}
+            if let Err(Elapsed { .. }) = try_join_all(tasks).await {
+                tracing::error!("task timed out!");
             }
         });
     }
