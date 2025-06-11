@@ -7,9 +7,9 @@ use serde::Deserialize;
 use tokio::sync::mpsc::Receiver;
 use tracing::debug;
 
-use crate::wp::MultiPageResponse;
 use crate::SharedState;
 use crate::updater::parse_js_header;
+use crate::wp::MultiPageResponse;
 
 #[derive(Debug)]
 struct PageInfo {
@@ -63,7 +63,13 @@ async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, Ve
         let Some(header) = parse_js_header(&item.content) else {
             continue;
         };
-        syncs.entry(SyncSource { repo: header.repo, ref_: header.ref_ }).or_default().push(item.title);
+        syncs
+            .entry(SyncSource {
+                repo: header.repo,
+                ref_: header.ref_,
+            })
+            .or_default()
+            .push(item.title);
     }
 
     Ok(syncs)

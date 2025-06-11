@@ -54,6 +54,11 @@ pub async fn fetch(ss: &SharedState, title: &str) -> Result<String> {
         .error_for_status()?
         .json::<SinglePageResponse>()
         .await?;
-    let [Page { revisions: [rev], title: _ }] = r.query.pages;
+    let [
+        Page {
+            revisions: [rev],
+            title: _,
+        },
+    ] = r.query.pages;
     Ok(rev.slots.main.content)
 }

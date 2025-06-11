@@ -53,7 +53,10 @@ impl Push {
             Commits::Multiple(n) => format!("{n} commits"),
         };
 
-        format!("[[[Wikipedia:Bots/Requests for approval/DeadbeefBot II|BOT]]] {author}: {commit} ({})", self.url)
+        format!(
+            "[[[Wikipedia:Bots/Requests for approval/DeadbeefBot II|BOT]]] {author}: {commit} ({})",
+            self.url
+        )
     }
 }
 

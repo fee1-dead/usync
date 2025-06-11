@@ -54,7 +54,8 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
         .lines()
         .next()?
         .trim()
-        .strip_prefix("//")?.trim_start()
+        .strip_prefix("//")?
+        .trim_start()
         .strip_prefix("{{Wikipedia:USync")?
         .strip_suffix("}}")?
         .trim()
@@ -64,7 +65,7 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
     let mut repo = None;
     let mut ref_ = None;
     let mut path = None;
-        
+
     for frag in it {
         let Some((param, arg)) = frag.split_once('=') else {
             continue;
@@ -78,7 +79,11 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
         }
     }
 
-    Some(Header { repo: repo?, ref_: ref_?, path: path? })
+    Some(Header {
+        repo: repo?,
+        ref_: ref_?,
+        path: path?,
+    })
 }
 
 #[test]
@@ -242,7 +247,7 @@ pub async fn task(mut cx: Context) {
             continue;
         };
 
-        let ss2= cx.ss.clone();
+        let ss2 = cx.ss.clone();
 
         let tasks = titles.into_iter().map(move |title| {
             tokio::time::timeout(
