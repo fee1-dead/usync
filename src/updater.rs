@@ -9,6 +9,7 @@ use tracing::debug;
 use tracing::error;
 use tracing::info;
 use tracing::trace;
+use tracing::warn;
 
 use crate::Commits;
 use crate::SharedState;
@@ -118,11 +119,25 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
         return;
     }
 
+    let Some(repo) = header.repo.strip_prefix("https://github.com/") else {
+        warn!(?header.repo, "non github URL");
+        return;
+    };
+
+    let repo = repo.strip_suffix('/').unwrap_or(repo);
+    let path = &header.path;
+
     // e.g. https://api.github.com/repos/fee1-dead/usync/contents/test.js
-    let file_url = push
+    let file_url = format!("https://api.github.com/repos/{repo}/contents/{path}");
+    let file_url2 = push
         .repository
         .contents_url
         .replace("{+path}", &header.path);
+
+    if file_url != file_url2 {
+        warn!(?file_url, ?file_url2, "urls mismatched");
+        return;
+    }
 
     // TODO: handle these errors and log
     let Ok(res) = ss
