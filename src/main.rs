@@ -6,6 +6,7 @@ use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, post, web
 use parser::SyncSource;
 use serde::Deserialize;
 use tokio::sync::mpsc::{self, Sender};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 mod parser;
@@ -168,6 +169,8 @@ async fn main() -> color_eyre::Result<()> {
         reparse_recv,
     };
     parser::start(parsectx);
+
+    info!("started");
 
     HttpServer::new(move || App::new().app_data(data.clone()).service(handle))
         .bind(("0.0.0.0", 8000))?
