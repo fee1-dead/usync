@@ -13,41 +13,24 @@ mod parser;
 mod updater;
 mod wp;
 
-pub struct SharedState {
-    map: Mutex<HashMap<SyncSource, String>>,
+struct SharedState {
+    map: Mutex<HashMap<SyncSource, Vec<String>>>,
     client: w::Client,
     req: reqwest::Client,
 }
 
-pub struct State {
+struct State {
     sort: Sender<GitHubPush>,
 }
 
-pub enum SupportedWiki {
-    Enwiki,
-}
-
-pub struct SyncConfig {
-    pub repos: HashMap<String, Repo>,
-}
-
-pub struct Repo {
-    pub files: HashMap<String, File>,
-}
-
-pub struct File {
-    pub wiki: SupportedWiki,
-    pub page_id: u64,
-}
-
-pub enum Commits {
+enum Commits {
     /// commit message
     Single(String),
     /// number of commits
     Multiple(usize),
 }
 
-pub struct Push {
+struct Push {
     commits: Commits,
     authors: Vec<String>,
     url: String,
@@ -74,12 +57,12 @@ impl Push {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 struct GitHubAuthor {
     name: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 struct GitHubCommit {
     author: GitHubAuthor,
     committer: GitHubAuthor,
@@ -88,13 +71,13 @@ struct GitHubCommit {
     modified: Vec<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 struct Repository {
     html_url: String,
     contents_url: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 struct GitHubPush {
     compare: String,
     commits: Vec<GitHubCommit>,

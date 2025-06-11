@@ -25,7 +25,7 @@ pub struct SyncSource {
     pub ref_: String,
 }
 
-async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, String>> {
+async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, Vec<String>>> {
     let mut stream = client.get_all(
         &[
             ("action", "query"),
@@ -51,7 +51,7 @@ async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, St
         },
     );
 
-    let mut syncs = HashMap::new();
+    let mut syncs: HashMap<SyncSource, Vec<String>> = HashMap::new();
 
     while let Some(item) = stream.next().await {
         let item = item?;
@@ -63,14 +63,7 @@ async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, St
         let Some(header) = parse_js_header(&item.content) else {
             continue;
         };
-
-        syncs.insert(
-            SyncSource {
-                repo: header.repo,
-                ref_: header.ref_,
-            },
-            item.title,
-        );
+        syncs.entry(SyncSource { repo: header.repo, ref_: header.ref_ }).or_default().push(item.title);
     }
 
     Ok(syncs)

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::future::try_join_all;
 use tokio::sync::mpsc::Receiver;
 
 use tokio::sync::mpsc::Sender;
@@ -218,7 +219,7 @@ pub async fn task(mut cx: Context) {
     while let Some(push) = cx.recv.recv().await {
         debug!(?push, "got task");
         // we must already know of an on-wiki sync file with the given repo and reference
-        let config = {
+        let titles = {
             // be very careful as to not hold the lock for too long
             let lock = cx.ss.map.lock().unwrap();
             let config = lock
@@ -233,24 +234,29 @@ pub async fn task(mut cx: Context) {
             config
         };
 
-        debug!(?config, "config");
+        debug!(?titles, "titles");
 
-        let Some(config) = config else {
-            info!("no config obtained");
+        let Some(titles) = titles else {
+            info!("no title obtained");
             cx.reparse_request.send(()).await.unwrap();
             continue;
         };
 
-        let task = tokio::time::timeout(
-            Duration::from_secs(5),
-            sort(cx.ss.clone(), push, config.to_owned()),
-        );
+        let ss2= cx.ss.clone();
+
+        let tasks = titles.into_iter().map(move |title| {
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                sort(ss2.clone(), push.clone(), title),
+            )
+        });
+
         tokio::spawn(async move {
-            match task.await {
+            match try_join_all(tasks).await {
                 Err(_) => {
                     tracing::error!("task timed out!");
                 }
-                Ok(()) => {}
+                Ok(_) => {}
             }
         });
     }
