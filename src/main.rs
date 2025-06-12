@@ -87,6 +87,8 @@ struct GitHubPush {
     #[serde(rename = "ref")]
     ref_: String,
     repository: Repository,
+    #[serde(skip, default)]
+    retry: bool,
 }
 
 #[post("/webhook")]
@@ -139,13 +141,14 @@ async fn main() -> color_eyre::Result<()> {
         req: reqwest::ClientBuilder::new().use_rustls_tls().build()?,
     });
     let data = web::Data::new(State {
-        sort: sort_send,
+        sort: sort_send.clone(),
         // shared: shared.clone(),
     });
 
     let updaterctx = updater::Context {
         ss: shared.clone(),
         reparse_request: reparse_send,
+        send: sort_send,
         recv: update_recv,
     };
     updater::start(updaterctx);

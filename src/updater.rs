@@ -20,6 +20,7 @@ use crate::{GitHubPush, Push};
 
 pub struct Context {
     pub ss: Arc<SharedState>,
+    pub send: Sender<GitHubPush>,
     pub recv: Receiver<GitHubPush>,
     pub reparse_request: Sender<()>,
 }
@@ -245,6 +246,18 @@ pub async fn task(mut cx: Context) {
         let Some(titles) = titles else {
             info!("no title obtained");
             cx.reparse_request.send(()).await.unwrap();
+
+            // send the push event back for a retry. Make sure that we don't keep retrying in a loop though.
+            if !push.retry {
+                let mut push = push;
+                push.retry = true;
+                let sender = cx.send.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    let _ = sender.send(push).await;
+                });
+            }
+
             continue;
         };
 
