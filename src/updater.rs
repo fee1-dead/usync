@@ -56,13 +56,18 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
         .lines()
         .next()?
         .trim()
-        .strip_prefix("//")?
+        .trim_start_matches("//")
+        .trim_start_matches("/*!")
+        .trim_start_matches("/*")
         .trim_start()
+        .trim_end_matches("*/")
+        .trim_end()
         .strip_prefix("{{Wikipedia:USync")?
         .strip_suffix("}}")?
         .trim()
         .split('|')
         .map(str::trim);
+
 
     let mut repo = None;
     let mut ref_ = None;
@@ -90,16 +95,21 @@ pub fn parse_js_header(s: &str) -> Option<Header> {
 
 #[test]
 fn test_header_parse() {
-    let h = "// {{Wikipedia:USync | repo = https://github.com/fee1-dead/usync |ref = refs/heads/main |path=test.js}}";
+    let headers = [
+        "// {{Wikipedia:USync | repo = https://github.com/fee1-dead/usync |ref = refs/heads/main |path=test.js}}",
+        "/* {{Wikipedia:USync | repo = https://github.com/fee1-dead/usync |ref = refs/heads/main |path=test.js}} */",
+        "/*! {{Wikipedia:USync | repo = https://github.com/fee1-dead/usync |ref = refs/heads/main |path=test.js}} */",
+    ];
 
-    let h = parse_js_header(h);
-
-    assert!(h.is_some());
-
-    let h = h.unwrap();
-    assert_eq!("https://github.com/fee1-dead/usync", h.repo);
-    assert_eq!("refs/heads/main", h.ref_);
-    assert_eq!("test.js", h.path);
+    for &h in &headers {
+        let parsed = parse_js_header(h);
+        assert!(parsed.is_some());
+        
+        let parsed = parsed.unwrap();
+        assert_eq!("https://github.com/fee1-dead/usync", parsed.repo);
+        assert_eq!("refs/heads/main", parsed.ref_);
+        assert_eq!("test.js", parsed.path);
+    }
 }
 
 pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
