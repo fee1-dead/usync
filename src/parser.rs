@@ -56,7 +56,7 @@ async fn search(client: &w::Client) -> color_eyre::Result<HashMap<SyncSource, Ve
     while let Some(item) = stream.next().await {
         let item = item?;
 
-        if item.contentmodel != "javascript" {
+        if item.contentmodel != "javascript" && item.contentmodel != "css" {
             continue;
         }
 
