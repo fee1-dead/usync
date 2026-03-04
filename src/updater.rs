@@ -207,8 +207,8 @@ pub async fn sort(ss: Arc<SharedState>, mut push: GitHubPush, title: String) {
             ("summary", &summary),
             ("bot", "1"),
             ("nocreate", "1"),
-            ("contentformat", "text/javascript"),
-            ("contentmodel", "javascript"),
+            // ("contentformat", "text/javascript"),
+            // ("contentmodel", "javascript"),
             ("token", &tok),
         ])
         .send()

@@ -47,7 +47,7 @@ pub async fn fetch(ss: &SharedState, title: &str) -> Result<String> {
             ("titles", title),
             ("rvprop", "content"),
             ("rvslots", "main"),
-            ("rvcontentformat-main", "text/javascript"),
+            // ("rvcontentformat-main", "text/javascript"),
         ])
         .send()
         .await?
